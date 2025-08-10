@@ -52,7 +52,13 @@ public class AuthService {
     }
 
     public UserDto signup(String email, String password) {
-        return null;
+        User user = new User();
+        user.setEmail(email);
+        user.setPassword(password);
+
+        User savedUser = userRepository.save(user);
+
+        return UserDto.from(savedUser);
     }
 
     public SessionStatus validate(String token, Long userId) {
