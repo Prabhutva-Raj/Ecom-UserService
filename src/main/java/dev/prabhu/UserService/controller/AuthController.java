@@ -30,6 +30,11 @@ public class AuthController {
         return authService.logout(token, userId);
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestBody LogoutRequestDto request) {
+        return authService.logout(request.getToken(), request.getUserId());
+    }
+
     @PostMapping("/signup")
     public ResponseEntity<UserDto> signUp(@RequestBody SignUpRequestDto request) {
         UserDto userDto = authService.signup(request.getEmail(), request.getPassword());
@@ -44,13 +49,13 @@ public class AuthController {
     }
 
     //below APIs are only for learning purposes, should not be present in actual systems
-    /*@GetMapping("/session")
+    @GetMapping("/session")
     public ResponseEntity<List<Session>> getAllSession(){
         return authService.getAllSession();
     }
 
-    @GetMapping("/users")
-    public ResponseEntity<List<User>> getAllUsers(){
-        return authService.getAllUsers();
-    }*/
+//    @GetMapping("/users")
+//    public ResponseEntity<List<User>> getAllUsers(){
+//        return authService.getAllUsers();
+//    }
 }

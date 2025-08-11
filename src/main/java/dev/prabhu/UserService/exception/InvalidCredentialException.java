@@ -1,4 +1,14 @@
 package dev.prabhu.UserService.exception;
 
-public class InvalidCredentialException {
+public class InvalidCredentialException extends RuntimeException{
+    public InvalidCredentialException() {
+    }
+
+    public InvalidCredentialException(String message) {
+        super(message);
+    }
+
+    public InvalidCredentialException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
