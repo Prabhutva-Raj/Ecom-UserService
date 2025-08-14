@@ -2,28 +2,32 @@ package dev.prabhu.UserService.service;
 
 import dev.prabhu.UserService.dto.UserDto;
 import dev.prabhu.UserService.exception.InvalidCredentialException;
+import dev.prabhu.UserService.exception.InvalidTokenException;
 import dev.prabhu.UserService.exception.UserNotFoundException;
 import dev.prabhu.UserService.model.SessionStatus;
 import dev.prabhu.UserService.model.User;
 import dev.prabhu.UserService.model.Session;
 import dev.prabhu.UserService.repository.SessionRepository;
 import dev.prabhu.UserService.repository.UserRepository;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.MacAlgorithm;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MultiValueMapAdapter;
 
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import javax.crypto.SecretKey;
+import java.time.LocalDate;
+import java.util.*;
 
 @Service
 public class AuthService {
     private UserRepository userRepository;
     private SessionRepository sessionRepository;
+    private BCryptPasswordEncoder bCryptPasswordEncoder;
 
     public AuthService(UserRepository userRepository, SessionRepository sessionRepository) {
         this.userRepository = userRepository;
@@ -42,11 +46,22 @@ public class AuthService {
 
         //verify the password
         if(!user.getPassword().equals(password)) {
+        //if (!bCryptPasswordEncoder.matches(password, user.getPassword())) {
             throw new InvalidCredentialException(("Invalid Credentials"));
         }
 
-        //token generation
-        String token = RandomStringUtils.randomAlphanumeric(30);
+        //Token generation
+        //String token = RandomStringUtils.randomAlphanumeric(30);
+        MacAlgorithm alg = Jwts.SIG.HS256;
+        SecretKey key = alg.key().build();
+
+        Map<String, Object> jsonForJWT = new HashMap<>();       //adding claims
+        jsonForJWT.put("email", user.getEmail());
+        jsonForJWT.put("roles", user.getRoles());
+        jsonForJWT.put("createdAt", new Date());
+        jsonForJWT.put("expiringAt", new Date(LocalDate.now().plusDays(3).toEpochDay()));
+
+        String token = Jwts.builder().claims(jsonForJWT).signWith(key, alg).compact();      //generating token
 
         //Session Creation
         Session session = new Session();
@@ -66,13 +81,23 @@ public class AuthService {
     }
 
     public ResponseEntity<Void> logout(String token, Long userId) {
-        return null;
+        //validations -> token exists, token is not expired, user exists else throw exception
+        Optional<Session> sessionOptional = sessionRepository.findByTokenAndUser_Id(token, userId);
+        if (sessionOptional.isEmpty()) {
+            return null;
+        }
+        Session session = sessionOptional.get();
+        session.setSessionStatus(SessionStatus.ENDED);
+        sessionRepository.save(session);
+
+        return ResponseEntity.ok().build();
     }
 
     public UserDto signup(String email, String password) {
         User user = new User();
         user.setEmail(email);
         user.setPassword(password);
+        //user.setPassword(bCryptPasswordEncoder.encode(password));
 
         User savedUser = userRepository.save(user);
 
@@ -80,7 +105,15 @@ public class AuthService {
     }
 
     public SessionStatus validate(String token, Long userId) {
-        return null;
+        // check expiry: jwts parser = read the expiry date
+
+        //verifying from DB if session exists
+        Optional<Session> sessionOptional = sessionRepository.findByTokenAndUser_Id(token, userId);
+        if (sessionOptional.isEmpty() || sessionOptional.get().getSessionStatus().equals(SessionStatus.ENDED)) {
+            throw new InvalidTokenException("token is invalid");
+        }
+
+        return SessionStatus.ACTIVE;
     }
 
     //not to be in production
