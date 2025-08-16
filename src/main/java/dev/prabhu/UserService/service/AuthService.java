@@ -29,9 +29,10 @@ public class AuthService {
     private SessionRepository sessionRepository;
     private BCryptPasswordEncoder bCryptPasswordEncoder;
 
-    public AuthService(UserRepository userRepository, SessionRepository sessionRepository) {
+    public AuthService(UserRepository userRepository, SessionRepository sessionRepository, BCryptPasswordEncoder bCryptPasswordEncoder) {
         this.userRepository = userRepository;
         this.sessionRepository = sessionRepository;
+        this.bCryptPasswordEncoder = bCryptPasswordEncoder;
     }
 
     public ResponseEntity<UserDto> login(String email, String password) {
@@ -45,8 +46,8 @@ public class AuthService {
         User user = userOptional.get();
 
         //verify the password
-        if(!user.getPassword().equals(password)) {
-        //if (!bCryptPasswordEncoder.matches(password, user.getPassword())) {
+        //if(!user.getPassword().equals(password)) {
+        if (!bCryptPasswordEncoder.matches(password, user.getPassword())) {
             throw new InvalidCredentialException(("Invalid Credentials"));
         }
 
@@ -84,8 +85,13 @@ public class AuthService {
         //validations -> token exists, token is not expired, user exists else throw exception
         Optional<Session> sessionOptional = sessionRepository.findByTokenAndUser_Id(token, userId);
         if (sessionOptional.isEmpty()) {
-            return null;
+            throw new InvalidTokenException("Token or User is invalid");
         }
+
+        if(sessionOptional.get().getSessionStatus().equals(SessionStatus.ENDED)) {
+            throw new InvalidTokenException("Session is already ended");
+        }
+
         Session session = sessionOptional.get();
         session.setSessionStatus(SessionStatus.ENDED);
         sessionRepository.save(session);
@@ -96,8 +102,8 @@ public class AuthService {
     public UserDto signup(String email, String password) {
         User user = new User();
         user.setEmail(email);
-        user.setPassword(password);
-        //user.setPassword(bCryptPasswordEncoder.encode(password));
+        //user.setPassword(password);
+        user.setPassword(bCryptPasswordEncoder.encode(password));
 
         User savedUser = userRepository.save(user);
 
